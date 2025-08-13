@@ -1,0 +1,61 @@
+name: Deploy aggregated student sites
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+
+      - name: Prepare output folder
+        run: |
+          rm -rf _site
+          mkdir -p _site/alumnos
+          # Copia TU sitio (si ya tienes index.html, css/, etc.)
+          rsync -av --exclude ".git" --exclude "_site" ./ _site/
+
+      - name: Fetch student repos (public)
+        run: |
+          cd _site/alumnos
+          # === Añade aquí un 'git clone' por cada aprendiz ===
+          git clone --depth 1 https://github.com/SantiagoJMiranda/ADSO-3229648-INVESTIGACION-SJ-MIRANDA.git santiago-miranda
+          # elimina metadatos git para no interferir:
+          rm -rf santiago-miranda/.git
+
+          # EJEMPLOS para más estudiantes (duplica y cambia URL y carpeta):
+          # git clone --depth 1 https://github.com/ALUMNO2/REPO2.git alumno2
+          # rm -rf alumno2/.git
+
+      # Si los repos de estudiantes están en PRIVADO:
+      # - Crea un secret en tu repo: GH_PAT (token con permiso "repo")
+      # - Cambia los clones por:
+      #   git clone --depth 1 https://${{ secrets.GH_PAT }}@github.com/OWNER/REPO.git carpeta
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
